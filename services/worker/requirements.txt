@@ -1,0 +1,18 @@
+# The ssc_core shared package is installed separately (both Dockerfiles run
+# `pip install -e /srv/packages/shared/python` as an explicit prior step, and
+# README.md's local-dev instructions pass `-e ../../packages/shared/python`
+# as its own CLI argument). It is intentionally NOT listed here as `-e
+# ../../packages/shared/python`: pip resolves a relative `-e` path written
+# inside a requirements file against the process's current working
+# directory at invocation time, not against this file's own directory — in
+# the Docker build, that cwd is /srv (the Dockerfile's WORKDIR when this file
+# is installed), so `../../packages/shared/python` resolved to a path outside
+# the image entirely and pip failed with "not a valid editable requirement".
+# Keeping this file free of relative -e paths avoids relying on that
+# resolution behavior, which also means the shared package is installed
+# exactly once instead of twice.
+
+apscheduler>=3.10
+httpx>=0.27
+sqlalchemy[asyncio]>=2.0
+asyncpg>=0.29

@@ -1,0 +1,22 @@
+[Unit]
+Description=Server Security Center monitoring agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/ssc-agent/venv/bin/python -m ssc_agent.agent
+WorkingDirectory=/opt/ssc-agent
+Restart=always
+RestartSec=10
+# Least-privilege hardening. The agent still needs root to read
+# /var/log/auth.log, service-manage via systemctl status checks, and stat
+# files owned by other users for file-integrity checks — so it is not run as
+# an unprivileged user, but the sandboxing below limits what it can do.
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

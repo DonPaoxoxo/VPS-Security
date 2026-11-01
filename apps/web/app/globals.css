@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 222 25% 8%;
+  --foreground: 210 20% 92%;
+  --card: 222 22% 11%;
+  --card-border: 222 15% 20%;
+  --muted: 222 15% 16%;
+  --muted-foreground: 215 12% 60%;
+  --accent: 199 89% 56%;
+
+  --healthy: 152 60% 45%;
+  --warning: 38 92% 55%;
+  --critical: 0 72% 55%;
+  --info: 210 90% 60%;
+}
+
+* {
+  border-color: hsl(var(--card-border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted));
+  border-radius: 4px;
+}

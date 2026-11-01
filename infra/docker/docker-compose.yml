@@ -1,0 +1,131 @@
+name: server-security-center
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ssc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ssc}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No `ports:` — reachable only from other containers on ssc-internal,
+    # which itself has no route to the internet (internal: true below).
+    # Never exposed to the host or the public network, on this VPS or any
+    # other.
+    networks: [ssc-internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ssc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  api:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ssc}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ssc}
+      SESSION_SECRET: ${SESSION_SECRET}
+      ENVIRONMENT: production
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE:-none}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      PERFORMANCE_METRICS_RETENTION_DAYS: ${PERFORMANCE_METRICS_RETENTION_DAYS:-90}
+      UPTIME_HISTORY_RETENTION_DAYS: ${UPTIME_HISTORY_RETENTION_DAYS:-365}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # `api` must be on a non-internal network for its published port to
+    # actually work. `internal: true` on ssc-internal doesn't just block
+    # outbound traffic — Docker adds an isolation rule in the FORWARD chain
+    # for that bridge that also blocks the inbound path host-published-port
+    # traffic takes to reach the container, even though `docker inspect`
+    # still shows the PortBindings as configured. Confirmed on the real VPS:
+    # `docker compose port api 8000` returned `:0` and the port was refused
+    # with `api` on ssc-internal alone. ssc-egress (plain bridge, already
+    # used by `worker` the same way) gives it that non-isolated path.
+    networks: [ssc-internal, ssc-egress]
+    # Published to loopback ONLY — not 0.0.0.0, not the VPS's public IP.
+    # aaPanel's own Nginx (already running on 80/443 on this host) reverse-
+    # proxies a dedicated HTTPS subdomain to 127.0.0.1:18080 — see
+    # infra/deployment/AAPANEL_REVERSE_PROXY.md. Nothing else can reach this
+    # port from outside this VPS's own loopback interface regardless of
+    # which Docker network carries it.
+    ports:
+      - "127.0.0.1:18080:8000"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: services/worker/Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ssc}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ssc}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      PERFORMANCE_METRICS_RETENTION_DAYS: ${PERFORMANCE_METRICS_RETENTION_DAYS:-90}
+      UPTIME_HISTORY_RETENTION_DAYS: ${UPTIME_HISTORY_RETENTION_DAYS:-365}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        # Not a functional dependency (the worker never calls the API) — used
+        # purely as a migration gate: api's entrypoint runs `alembic upgrade
+        # head` before it reports healthy, so waiting on it here guarantees
+        # the worker never queries a schema that isn't migrated yet on a
+        # fresh deploy.
+        condition: service_healthy
+    networks:
+      - ssc-internal   # reach Postgres
+      - ssc-egress     # outbound only: website checks, aaPanel TCP probes, Telegram API
+    # No `ports:` — this service is never reachable from outside its own
+    # networks, matching the "monitoring workers must run without public
+    # ports" requirement.
+    healthcheck:
+      # Checks that scheduled jobs are actually running and succeeding, not
+      # just that the python process exists — a worker stuck in a bad state
+      # while the process is still alive previously reported "healthy"
+      # incorrectly. See worker/health.py and worker/healthcheck.py.
+      test: ["CMD", "python", "-m", "worker.healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s   # give the first 60-120s job intervals time to run once before judging it
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+networks:
+  ssc-internal:
+    internal: true
+  ssc-egress:
+    driver: bridge
+
+volumes:
+  postgres_data:

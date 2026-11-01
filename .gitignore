@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv-check/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.env
+.env.local
+
+# Env files with real secrets
+infra/docker/.env
+apps/web/.env*
+!apps/web/.env.example
+!infra/docker/.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# pytest
+.pytest_cache/
+# Additional security exclusions
+**/.env
+**/.env.*
+!**/.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Python environments
+.venv/
+venv/
+# Local Claude Code settings
+.claude/
+
+# Additional private files
+*.p12
+id_rsa
+venv/
