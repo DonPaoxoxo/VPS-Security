@@ -1,10 +1,15 @@
 "use client";
 
+import { Gauge } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import type { ServerSummary } from "@/lib/types";
 
@@ -16,56 +21,112 @@ interface MetricPoint {
 }
 
 export default function PerformancePage() {
-  const [servers, setServers] = useState<ServerSummary[]>([]);
-  const [selected, setSelected] = useState<string>("");
-  const [metrics, setMetrics] = useState<MetricPoint[]>([]);
+  const [servers, setServers] = useState<ServerSummary[] | null>(null);
+  const [metricsByServer, setMetricsByServer] = useState<Record<string, MetricPoint[]>>({});
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<ServerSummary[]>("/servers").then((data) => {
-      setServers(data);
-      if (data.length > 0) setSelected(data[0].id);
-    });
+    api
+      .get<ServerSummary[]>("/servers")
+      .then(async (data) => {
+        setServers(data);
+        const entries = await Promise.all(
+          data.map(async (s) => {
+            try {
+              const points = await api.get<MetricPoint[]>(`/performance/${s.id}?hours=24`);
+              return [s.id, points] as const;
+            } catch {
+              return [s.id, []] as const;
+            }
+          })
+        );
+        setMetricsByServer(Object.fromEntries(entries));
+      })
+      .catch(() => setError("Could not load servers from the API."));
   }, []);
-
-  useEffect(() => {
-    if (!selected) return;
-    api.get<MetricPoint[]>(`/performance/${selected}?hours=24`).then(setMetrics).catch(() => setMetrics([]));
-  }, [selected]);
-
-  const chartData = metrics.map((m) => ({
-    time: new Date(m.recorded_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    cpu: m.cpu_pct,
-    ram: m.ram_pct,
-    disk: m.disk_pct,
-  }));
 
   return (
     <div>
-      <PageHeader title="Performance Monitoring" description="Last 24 hours of resource usage per server." />
+      <PageHeader title="Performance Monitoring" description="Last 24 hours of resource usage across every server." />
 
-      <select
-        className="mb-6 rounded-md border border-card-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        value={selected}
-        onChange={(e) => setSelected(e.target.value)}
-      >
-        {servers.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <ChartCard title="CPU %" dataKey="cpu" data={chartData} color="hsl(var(--info))" gradientId="cpuGradient" />
-        <ChartCard title="RAM %" dataKey="ram" data={chartData} color="hsl(var(--warning))" gradientId="ramGradient" />
-        <ChartCard title="Disk %" dataKey="disk" data={chartData} color="hsl(var(--healthy))" gradientId="diskGradient" />
-      </div>
-
-      {chartData.length === 0 && (
-        <p className="mt-6 text-sm text-muted-foreground">
-          No performance history yet for this server — data appears once its agent starts sending heartbeats.
-        </p>
+      {error && (
+        <div className="mb-6 rounded-xl border border-critical/30 bg-critical/10 px-4 py-3 text-sm text-critical">
+          {error}
+        </div>
       )}
+
+      {!servers && !error && (
+        <div className="space-y-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i}>
+              <Skeleton className="mb-3 h-4 w-40" />
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <Skeleton className="h-56 w-full rounded-xl" />
+                <Skeleton className="h-56 w-full rounded-xl" />
+                <Skeleton className="h-56 w-full rounded-xl" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {servers && servers.length === 0 && (
+        <Card>
+          <EmptyState icon={Gauge} title="No servers registered yet" description="Add a server to start seeing resource usage history here." />
+        </Card>
+      )}
+
+      <div className="space-y-8">
+        {servers?.map((s) => {
+          const metrics = metricsByServer[s.id];
+          const chartData = (metrics ?? []).map((m) => ({
+            time: new Date(m.recorded_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            cpu: m.cpu_pct,
+            ram: m.ram_pct,
+            disk: m.disk_pct,
+          }));
+
+          return (
+            <div key={s.id}>
+              <div className="mb-3 flex items-center gap-2.5">
+                <Link href={`/servers/${s.id}`} className="text-sm font-semibold text-foreground hover:text-accent">
+                  {s.name}
+                </Link>
+                <Badge tone={toneForStatus(s.agent_status ?? "never_connected")}>
+                  {s.agent_status ?? "never_connected"}
+                </Badge>
+                <span className="text-xs text-muted-foreground">{s.hostname_or_ip}</span>
+              </div>
+
+              {metrics === undefined && (
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                  <Skeleton className="h-56 w-full rounded-xl" />
+                  <Skeleton className="h-56 w-full rounded-xl" />
+                  <Skeleton className="h-56 w-full rounded-xl" />
+                </div>
+              )}
+
+              {metrics !== undefined && chartData.length === 0 && (
+                <Card>
+                  <EmptyState
+                    icon={Gauge}
+                    title="No performance history yet"
+                    description="Data appears once this server's agent starts sending heartbeats."
+                  />
+                </Card>
+              )}
+
+              {chartData.length > 0 && (
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                  <ChartCard title="CPU %" dataKey="cpu" data={chartData} color="hsl(var(--info))" gradientId={`cpuGradient-${s.id}`} />
+                  <ChartCard title="RAM %" dataKey="ram" data={chartData} color="hsl(var(--warning))" gradientId={`ramGradient-${s.id}`} />
+                  <ChartCard title="Disk %" dataKey="disk" data={chartData} color="hsl(var(--healthy))" gradientId={`diskGradient-${s.id}`} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
