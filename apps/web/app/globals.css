@@ -3,33 +3,55 @@
 @tailwind utilities;
 
 :root {
-  --background: 222 25% 8%;
-  --foreground: 210 20% 92%;
-  --card: 222 22% 11%;
-  --card-border: 222 15% 20%;
-  --muted: 222 15% 16%;
-  --muted-foreground: 215 12% 60%;
+  --background: 224 28% 7%;
+  --foreground: 210 20% 94%;
+  --card: 224 24% 10%;
+  --card-border: 222 18% 19%;
+  --surface: 223 20% 13%;
+  --surface-border: 222 16% 22%;
+  --muted: 222 16% 15%;
+  --muted-foreground: 215 14% 62%;
   --accent: 199 89% 56%;
+  --accent-foreground: 224 28% 7%;
+  --ring: 199 89% 56%;
 
-  --healthy: 152 60% 45%;
-  --warning: 38 92% 55%;
-  --critical: 0 72% 55%;
-  --info: 210 90% 60%;
+  --healthy: 152 58% 46%;
+  --warning: 38 92% 56%;
+  --critical: 0 72% 58%;
+  --info: 210 90% 62%;
+
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 1px 1px 0 rgb(0 0 0 / 0.2);
+  --shadow-elevated: 0 8px 24px -8px rgb(0 0 0 / 0.5), 0 2px 6px -2px rgb(0 0 0 / 0.3);
 }
 
 * {
   border-color: hsl(var(--card-border));
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid hsl(var(--ring) / 0.6);
+  outline-offset: 1px;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background-color: hsl(var(--muted));
   border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.4);
 }

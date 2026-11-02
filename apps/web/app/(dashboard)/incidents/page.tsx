@@ -1,15 +1,21 @@
 "use client";
 
+import { AlertTriangle, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableContainer, TableHead, TableRow, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import type { Alert, DowntimeIncident } from "@/lib/types";
 
 export default function IncidentsPage() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [incidents, setIncidents] = useState<DowntimeIncident[]>([]);
+  const [alerts, setAlerts] = useState<Alert[] | null>(null);
+  const [incidents, setIncidents] = useState<DowntimeIncident[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -38,75 +44,97 @@ export default function IncidentsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Incidents & Alerts</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Active and historical alerts, plus the downtime incidents behind them.</p>
+      <PageHeader
+        title="Incidents & Alerts"
+        description="Active and historical alerts, plus the downtime incidents behind them."
+      />
 
-      {error && <p className="mt-4 text-sm text-critical">{error}</p>}
+      {error && (
+        <div className="mb-6 rounded-xl border border-critical/30 bg-critical/10 px-4 py-3 text-sm text-critical">
+          {error}
+        </div>
+      )}
 
-      <h2 className="mt-6 text-sm font-medium text-muted-foreground">Alerts</h2>
-      <div className="mt-2 space-y-2">
-        {alerts.map((a) => (
-          <div key={a.id} className="flex items-center justify-between rounded-lg border border-card-border p-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Badge tone={toneForStatus(a.severity)}>{a.severity}</Badge>
-                <p className="text-sm font-medium">{a.title}</p>
+      <h2 className="mb-3 text-sm font-semibold text-foreground">Alerts</h2>
+      {!alerts && (
+        <div className="space-y-2">
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+      )}
+      {alerts && alerts.length === 0 && (
+        <Card>
+          <EmptyState icon={AlertTriangle} title="No alerts yet" />
+        </Card>
+      )}
+      <div className="space-y-2">
+        {alerts?.map((a) => (
+          <Card key={a.id} className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Badge tone={toneForStatus(a.severity)}>{a.severity}</Badge>
+                  <p className="text-sm font-medium text-foreground">{a.title}</p>
+                </div>
+                {a.detail && <p className="mt-1 text-xs text-muted-foreground">{a.detail}</p>}
+                <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  {new Date(a.triggered_at).toLocaleString()}
+                </p>
               </div>
-              {a.detail && <p className="mt-1 text-xs text-muted-foreground">{a.detail}</p>}
-              <p className="text-xs text-muted-foreground">{new Date(a.triggered_at).toLocaleString()}</p>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge tone={toneForStatus(a.status)}>{a.status}</Badge>
+                {a.status === "open" && (
+                  <Button variant="outline" onClick={() => acknowledge(a.id)}>
+                    Acknowledge
+                  </Button>
+                )}
+                {a.status !== "resolved" && (
+                  <Button variant="outline" onClick={() => resolve(a.id)}>
+                    Resolve
+                  </Button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge tone={toneForStatus(a.status)}>{a.status}</Badge>
-              {a.status === "open" && (
-                <Button variant="outline" onClick={() => acknowledge(a.id)}>
-                  Acknowledge
-                </Button>
-              )}
-              {a.status !== "resolved" && (
-                <Button variant="outline" onClick={() => resolve(a.id)}>
-                  Resolve
-                </Button>
-              )}
-            </div>
-          </div>
+          </Card>
         ))}
-        {alerts.length === 0 && <p className="text-sm text-muted-foreground">No alerts yet.</p>}
       </div>
 
-      <h2 className="mt-8 text-sm font-medium text-muted-foreground">Downtime Incidents</h2>
-      <div className="mt-2 overflow-hidden rounded-lg border border-card-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2">Target</th>
-              <th className="px-4 py-2">Started</th>
-              <th className="px-4 py-2">Resolved</th>
-              <th className="px-4 py-2">Cause</th>
-            </tr>
-          </thead>
-          <tbody>
-            {incidents.map((i) => (
-              <tr key={i.id} className="border-t border-card-border">
-                <td className="px-4 py-2">
-                  {i.target_type} {i.target_id.slice(0, 8)}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{new Date(i.started_at).toLocaleString()}</td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {i.resolved_at ? new Date(i.resolved_at).toLocaleString() : "Ongoing"}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{i.cause.replace(/_/g, " ")}</td>
-              </tr>
-            ))}
-            {incidents.length === 0 && (
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-foreground">Downtime Incidents</h2>
+      {!incidents && <Skeleton className="h-32 w-full rounded-xl" />}
+      {incidents && incidents.length === 0 && (
+        <TableContainer>
+          <EmptyState icon={Clock} title="No downtime incidents recorded yet" />
+        </TableContainer>
+      )}
+      {incidents && incidents.length > 0 && (
+        <TableContainer>
+          <Table>
+            <TableHead>
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                  No downtime incidents recorded yet.
-                </td>
+                <Th>Target</Th>
+                <Th>Started</Th>
+                <Th>Resolved</Th>
+                <Th>Cause</Th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </TableHead>
+            <TableBody>
+              {incidents.map((i) => (
+                <TableRow key={i.id}>
+                  <Td>
+                    {i.target_type} {i.target_id.slice(0, 8)}
+                  </Td>
+                  <Td className="text-muted-foreground">{new Date(i.started_at).toLocaleString()}</Td>
+                  <Td className="text-muted-foreground">
+                    {i.resolved_at ? new Date(i.resolved_at).toLocaleString() : "Ongoing"}
+                  </Td>
+                  <Td className="text-muted-foreground">{i.cause.replace(/_/g, " ")}</Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </div>
   );
 }

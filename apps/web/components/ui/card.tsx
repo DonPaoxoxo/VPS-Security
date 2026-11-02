@@ -2,17 +2,25 @@ import { type HTMLAttributes } from "react";
 
 import { cn } from "@/lib/cn";
 
-export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+export function Card({
+  className,
+  interactive = false,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { interactive?: boolean }) {
   return (
     <div
-      className={cn("rounded-lg border border-card-border bg-card shadow-sm", className)}
+      className={cn(
+        "rounded-xl border border-card-border bg-card shadow-card transition-all duration-200",
+        interactive && "hover:-translate-y-0.5 hover:border-surface-border hover:shadow-elevated",
+        className
+      )}
       {...props}
     />
   );
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-1 p-4 pb-2", className)} {...props} />;
+  return <div className={cn("flex flex-col gap-1 p-5 pb-3", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
@@ -20,5 +28,5 @@ export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingEle
 }
 
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-4 pt-2", className)} {...props} />;
+  return <div className={cn("p-5 pt-3", className)} {...props} />;
 }

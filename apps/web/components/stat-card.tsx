@@ -12,23 +12,26 @@ export function StatCard({
   label: string;
   value: number | string;
   icon: LucideIcon;
-  tone?: "default" | "healthy" | "warning" | "critical";
+  tone?: "default" | "healthy" | "warning" | "critical" | "info";
 }) {
   const toneClasses = {
-    default: "text-foreground",
-    healthy: "text-healthy",
-    warning: "text-warning",
-    critical: "text-critical",
+    default: { text: "text-foreground", badge: "bg-muted text-muted-foreground" },
+    healthy: { text: "text-healthy", badge: "bg-healthy/10 text-healthy" },
+    warning: { text: "text-warning", badge: "bg-warning/10 text-warning" },
+    critical: { text: "text-critical", badge: "bg-critical/10 text-critical" },
+    info: { text: "text-info", badge: "bg-info/10 text-info" },
   } as const;
 
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between p-4">
-        <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className={cn("mt-1 text-2xl font-semibold", toneClasses[tone])}>{value}</p>
+    <Card interactive>
+      <CardContent className="flex items-center justify-between gap-3 p-5">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+          <p className={cn("mt-1.5 text-2xl font-semibold tracking-tight", toneClasses[tone].text)}>{value}</p>
         </div>
-        <Icon className="h-8 w-8 text-muted-foreground opacity-60" />
+        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", toneClasses[tone].badge)}>
+          <Icon className="h-5 w-5" />
+        </div>
       </CardContent>
     </Card>
   );

@@ -1,14 +1,19 @@
 "use client";
 
+import { KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { Table, TableBody, TableContainer, TableHead, TableRow, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import type { LoginEvent } from "@/lib/types";
 
 export default function LoginActivityPage() {
-  const [events, setEvents] = useState<LoginEvent[]>([]);
+  const [events, setEvents] = useState<LoginEvent[] | null>(null);
   const [onlyFailed, setOnlyFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,52 +26,60 @@ export default function LoginActivityPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Login Activity</h1>
-      <p className="mt-1 text-sm text-muted-foreground">SSH login attempts collected by each server's agent.</p>
+      <PageHeader
+        title="Login Activity"
+        description="SSH login attempts collected by each server's agent."
+        actions={
+          <Button variant={onlyFailed ? "default" : "outline"} onClick={() => setOnlyFailed((v) => !v)}>
+            {onlyFailed ? "Showing failed only" : "Show failed only"}
+          </Button>
+        }
+      />
 
-      <div className="mt-4">
-        <Button variant={onlyFailed ? "default" : "outline"} onClick={() => setOnlyFailed((v) => !v)}>
-          {onlyFailed ? "Showing failed only" : "Show failed only"}
-        </Button>
-      </div>
+      {error && (
+        <div className="mb-6 rounded-xl border border-critical/30 bg-critical/10 px-4 py-3 text-sm text-critical">
+          {error}
+        </div>
+      )}
 
-      {error && <p className="mt-4 text-sm text-critical">{error}</p>}
+      {!events && !error && <SkeletonTable rows={6} cols={6} />}
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-card-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2">Time</th>
-              <th className="px-4 py-2">Server</th>
-              <th className="px-4 py-2">Account</th>
-              <th className="px-4 py-2">Source IP</th>
-              <th className="px-4 py-2">Method</th>
-              <th className="px-4 py-2">Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((e) => (
-              <tr key={e.id} className="border-t border-card-border">
-                <td className="px-4 py-2 text-muted-foreground">{new Date(e.occurred_at).toLocaleString()}</td>
-                <td className="px-4 py-2">{e.server_name ?? e.server_id}</td>
-                <td className="px-4 py-2">{e.account ?? "—"}</td>
-                <td className="px-4 py-2 font-mono text-xs">{e.source_ip ?? "—"}</td>
-                <td className="px-4 py-2 text-muted-foreground">{e.auth_method ?? "—"}</td>
-                <td className="px-4 py-2">
-                  <Badge tone={e.was_successful ? "healthy" : "critical"}>{e.was_successful ? "Success" : "Failed"}</Badge>
-                </td>
-              </tr>
-            ))}
-            {events.length === 0 && (
+      {events && events.length === 0 && (
+        <TableContainer>
+          <EmptyState icon={KeyRound} title="No login events recorded yet" />
+        </TableContainer>
+      )}
+
+      {events && events.length > 0 && (
+        <TableContainer>
+          <Table>
+            <TableHead>
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                  No login events recorded yet.
-                </td>
+                <Th>Time</Th>
+                <Th>Server</Th>
+                <Th>Account</Th>
+                <Th>Source IP</Th>
+                <Th>Method</Th>
+                <Th>Result</Th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </TableHead>
+            <TableBody>
+              {events.map((e) => (
+                <TableRow key={e.id}>
+                  <Td className="text-muted-foreground">{new Date(e.occurred_at).toLocaleString()}</Td>
+                  <Td>{e.server_name ?? e.server_id}</Td>
+                  <Td>{e.account ?? "—"}</Td>
+                  <Td className="font-mono text-xs">{e.source_ip ?? "—"}</Td>
+                  <Td className="text-muted-foreground">{e.auth_method ?? "—"}</Td>
+                  <Td>
+                    <Badge tone={e.was_successful ? "healthy" : "critical"}>{e.was_successful ? "Success" : "Failed"}</Badge>
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </div>
   );
 }

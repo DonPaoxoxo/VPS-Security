@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api";
 import type { ServerSummary } from "@/lib/types";
 
@@ -40,11 +41,10 @@ export default function PerformancePage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Performance Monitoring</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Last 24 hours of resource usage per server.</p>
+      <PageHeader title="Performance Monitoring" description="Last 24 hours of resource usage per server." />
 
       <select
-        className="mt-4 rounded-md border border-card-border bg-background px-3 py-2 text-sm"
+        className="mb-6 rounded-md border border-card-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
       >
@@ -55,10 +55,10 @@ export default function PerformancePage() {
         ))}
       </select>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <ChartCard title="CPU %" dataKey="cpu" data={chartData} color="hsl(var(--info))" />
-        <ChartCard title="RAM %" dataKey="ram" data={chartData} color="hsl(var(--warning))" />
-        <ChartCard title="Disk %" dataKey="disk" data={chartData} color="hsl(var(--healthy))" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <ChartCard title="CPU %" dataKey="cpu" data={chartData} color="hsl(var(--info))" gradientId="cpuGradient" />
+        <ChartCard title="RAM %" dataKey="ram" data={chartData} color="hsl(var(--warning))" gradientId="ramGradient" />
+        <ChartCard title="Disk %" dataKey="disk" data={chartData} color="hsl(var(--healthy))" gradientId="diskGradient" />
       </div>
 
       {chartData.length === 0 && (
@@ -75,26 +75,47 @@ function ChartCard({
   dataKey,
   data,
   color,
+  gradientId,
 }: {
   title: string;
   dataKey: string;
   data: Array<Record<string, string | number | null>>;
   color: string;
+  gradientId: string;
 }) {
   return (
-    <Card>
+    <Card interactive>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent className="h-56">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--card-border))" />
-            <XAxis dataKey="time" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
-            <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--card-border))" }} />
-            <Line type="monotone" dataKey={dataKey} stroke={color} dot={false} strokeWidth={2} />
-          </LineChart>
+          <AreaChart data={data}>
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={color} stopOpacity={0.35} />
+                <stop offset="95%" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--card-border))" vertical={false} />
+            <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+            <YAxis
+              tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+              domain={[0, 100]}
+              axisLine={false}
+              tickLine={false}
+              width={28}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--card-border))",
+                borderRadius: "0.5rem",
+                fontSize: "0.75rem",
+              }}
+            />
+            <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#${gradientId})`} dot={false} />
+          </AreaChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

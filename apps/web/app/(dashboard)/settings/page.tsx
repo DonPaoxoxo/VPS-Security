@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
@@ -80,16 +81,21 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="text-xl font-semibold">Settings</h1>
+      <PageHeader title="Settings" />
 
-      <Card className="mt-6">
+      <Card>
         <CardHeader>
           <CardTitle>Account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-1 pt-0 text-sm">
-          <p>{user?.display_name}</p>
+          <p className="font-medium text-foreground">{user?.display_name}</p>
           <p className="text-muted-foreground">{user?.email}</p>
-          <p className="text-muted-foreground">MFA: {user?.totp_enabled ? "Enabled" : "Not enabled"}</p>
+          <p className="text-muted-foreground">
+            MFA:{" "}
+            <span className={user?.totp_enabled ? "text-healthy" : "text-muted-foreground"}>
+              {user?.totp_enabled ? "Enabled" : "Not enabled"}
+            </span>
+          </p>
 
           {!user?.totp_enabled && !mfaSetup && (
             <Button variant="outline" className="mt-2" onClick={startMfaSetup}>

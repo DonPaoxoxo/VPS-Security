@@ -132,19 +132,36 @@ export default function AddServerWizardPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="text-xl font-semibold">Add Server</h1>
-      <ol className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground">Add Server</h1>
+      <ol className="mt-5 flex flex-wrap items-center gap-1.5">
         {STEPS.map((s, i) => (
-          <li
-            key={s}
-            className={`rounded-md px-2 py-1 ${i === step ? "bg-accent/20 text-accent" : i < step ? "text-healthy" : ""}`}
-          >
-            {i + 1}. {s}
+          <li key={s} className="flex items-center gap-1.5">
+            <span
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                i === step
+                  ? "bg-accent/15 text-accent"
+                  : i < step
+                    ? "text-healthy"
+                    : "text-muted-foreground"
+              }`}
+            >
+              <span
+                className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
+                  i === step ? "bg-accent text-accent-foreground" : i < step ? "bg-healthy text-white" : "bg-muted"
+                }`}
+              >
+                {i < step ? "✓" : i + 1}
+              </span>
+              {s}
+            </span>
+            {i < STEPS.length - 1 && <span className="h-px w-3 bg-card-border" />}
           </li>
         ))}
       </ol>
 
-      {error && <p className="mt-4 text-sm text-critical">{error}</p>}
+      {error && (
+        <div className="mt-4 rounded-xl border border-critical/30 bg-critical/10 px-4 py-3 text-sm text-critical">{error}</div>
+      )}
 
       <Card className="mt-6">
         <CardContent className="p-6">

@@ -1,13 +1,18 @@
 "use client";
 
+import { ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge, toneForStatus } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { Table, TableBody, TableContainer, TableHead, TableRow, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import type { SecurityEvent } from "@/lib/types";
 
 export default function SecurityCenterPage() {
-  const [events, setEvents] = useState<SecurityEvent[]>([]);
+  const [events, setEvents] = useState<SecurityEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,50 +21,57 @@ export default function SecurityCenterPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Security Center</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Events are labeled by actual evidence — not every anomaly is automatically a confirmed attack.
-      </p>
+      <PageHeader
+        title="Security Center"
+        description="Events are labeled by actual evidence — not every anomaly is automatically a confirmed attack."
+      />
 
-      {error && <p className="mt-4 text-sm text-critical">{error}</p>}
+      {error && (
+        <div className="mb-6 rounded-xl border border-critical/30 bg-critical/10 px-4 py-3 text-sm text-critical">
+          {error}
+        </div>
+      )}
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-card-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2">Time</th>
-              <th className="px-4 py-2">Server</th>
-              <th className="px-4 py-2">Event</th>
-              <th className="px-4 py-2">Severity</th>
-              <th className="px-4 py-2">Source IP</th>
-              <th className="px-4 py-2">Investigation</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((e) => (
-              <tr key={e.id} className="border-t border-card-border">
-                <td className="px-4 py-2 text-muted-foreground">{new Date(e.occurred_at).toLocaleString()}</td>
-                <td className="px-4 py-2">{e.server_name ?? e.server_id}</td>
-                <td className="px-4 py-2">{e.event_type}</td>
-                <td className="px-4 py-2">
-                  <Badge tone={toneForStatus(e.severity)}>{e.severity}</Badge>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{e.source_ip ?? "—"}</td>
-                <td className="px-4 py-2">
-                  <Badge tone={toneForStatus(e.investigation_status)}>{e.investigation_status}</Badge>
-                </td>
-              </tr>
-            ))}
-            {events.length === 0 && (
+      {!events && !error && <SkeletonTable rows={6} cols={6} />}
+
+      {events && events.length === 0 && (
+        <TableContainer>
+          <EmptyState icon={ShieldAlert} title="No security events recorded yet" />
+        </TableContainer>
+      )}
+
+      {events && events.length > 0 && (
+        <TableContainer>
+          <Table>
+            <TableHead>
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                  No security events recorded yet.
-                </td>
+                <Th>Time</Th>
+                <Th>Server</Th>
+                <Th>Event</Th>
+                <Th>Severity</Th>
+                <Th>Source IP</Th>
+                <Th>Investigation</Th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </TableHead>
+            <TableBody>
+              {events.map((e) => (
+                <TableRow key={e.id}>
+                  <Td className="text-muted-foreground">{new Date(e.occurred_at).toLocaleString()}</Td>
+                  <Td>{e.server_name ?? e.server_id}</Td>
+                  <Td>{e.event_type}</Td>
+                  <Td>
+                    <Badge tone={toneForStatus(e.severity)}>{e.severity}</Badge>
+                  </Td>
+                  <Td className="font-mono text-xs text-muted-foreground">{e.source_ip ?? "—"}</Td>
+                  <Td>
+                    <Badge tone={toneForStatus(e.investigation_status)}>{e.investigation_status}</Badge>
+                  </Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </div>
   );
 }

@@ -1,7 +1,12 @@
 "use client";
 
+import { Activity } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { SkeletonTable } from "@/components/ui/skeleton";
+import { Table, TableBody, TableContainer, TableHead, TableRow, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
 
 interface AuditLogEntry {
@@ -14,7 +19,7 @@ interface AuditLogEntry {
 }
 
 export default function ActivityHistoryPage() {
-  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [logs, setLogs] = useState<AuditLogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,42 +28,48 @@ export default function ActivityHistoryPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Activity History</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Audit trail of actions taken in this dashboard.</p>
+      <PageHeader title="Activity History" description="Audit trail of actions taken in this dashboard." />
 
-      {error && <p className="mt-4 text-sm text-critical">{error}</p>}
+      {error && (
+        <div className="mb-6 rounded-xl border border-critical/30 bg-critical/10 px-4 py-3 text-sm text-critical">
+          {error}
+        </div>
+      )}
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-card-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2">Time</th>
-              <th className="px-4 py-2">Action</th>
-              <th className="px-4 py-2">Resource</th>
-              <th className="px-4 py-2">IP Address</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((l) => (
-              <tr key={l.id} className="border-t border-card-border">
-                <td className="px-4 py-2 text-muted-foreground">{new Date(l.created_at).toLocaleString()}</td>
-                <td className="px-4 py-2">{l.action}</td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {l.resource_type ? `${l.resource_type} ${l.resource_id?.slice(0, 8) ?? ""}` : "—"}
-                </td>
-                <td className="px-4 py-2 font-mono text-xs">{l.ip_address ?? "—"}</td>
-              </tr>
-            ))}
-            {logs.length === 0 && (
+      {!logs && !error && <SkeletonTable rows={6} cols={4} />}
+
+      {logs && logs.length === 0 && (
+        <TableContainer>
+          <EmptyState icon={Activity} title="No activity recorded yet" />
+        </TableContainer>
+      )}
+
+      {logs && logs.length > 0 && (
+        <TableContainer>
+          <Table>
+            <TableHead>
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                  No activity recorded yet.
-                </td>
+                <Th>Time</Th>
+                <Th>Action</Th>
+                <Th>Resource</Th>
+                <Th>IP Address</Th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </TableHead>
+            <TableBody>
+              {logs.map((l) => (
+                <TableRow key={l.id}>
+                  <Td className="text-muted-foreground">{new Date(l.created_at).toLocaleString()}</Td>
+                  <Td>{l.action}</Td>
+                  <Td className="text-muted-foreground">
+                    {l.resource_type ? `${l.resource_type} ${l.resource_id?.slice(0, 8) ?? ""}` : "—"}
+                  </Td>
+                  <Td className="font-mono text-xs">{l.ip_address ?? "—"}</Td>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </div>
   );
 }
