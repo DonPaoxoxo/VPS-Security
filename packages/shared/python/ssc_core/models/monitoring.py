@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -69,6 +69,6 @@ class PerformanceMetric(Base, TimestampMixin):
     ram_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     disk_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     load_average: Mapped[float | None] = mapped_column(Float, nullable=True)
-    network_rx_bytes: Mapped[int | None] = mapped_column(nullable=True)
-    network_tx_bytes: Mapped[int | None] = mapped_column(nullable=True)
+    network_rx_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    network_tx_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     service_status: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
