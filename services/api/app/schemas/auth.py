@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -5,6 +7,21 @@ class OwnerSetupRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=12)
     display_name: str = Field(min_length=1, max_length=120)
+
+
+class CreateAdminRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=12)
+    display_name: str = Field(min_length=1, max_length=120)
+
+
+class AdminUserResponse(BaseModel):
+    id: str
+    email: str
+    display_name: str
+    totp_enabled: bool
+    is_active: bool
+    created_at: datetime
 
 
 class LoginRequest(BaseModel):

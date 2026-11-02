@@ -6,6 +6,15 @@ export interface CurrentUser {
   csrf_token: string;
 }
 
+export interface AdminUser {
+  id: string;
+  email: string;
+  display_name: string;
+  totp_enabled: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface ServerSummary {
   id: string;
   name: string;
