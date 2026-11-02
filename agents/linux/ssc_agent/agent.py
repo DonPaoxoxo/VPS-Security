@@ -38,7 +38,7 @@ def send_heartbeat(creds) -> None:
         "operating_system": platform.platform(),
         **metrics,
         "service_status": service_status,
-        "aapanel_local_status": aapanel_local_status(service_status),
+        "aapanel_local_status": aapanel_local_status(),
     }
     try:
         resp = requests.post(f"{creds.api_url}/agents/heartbeat", json=payload, headers=_headers(creds.api_key), timeout=15)
