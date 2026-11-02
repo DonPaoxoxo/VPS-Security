@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/cn";
 
@@ -117,6 +118,7 @@ export function NavSidebar() {
             <p className="truncate text-xs font-medium text-foreground">{user?.display_name || "Owner"}</p>
             <p className="truncate text-[11px] text-muted-foreground">{user?.email}</p>
           </div>
+          <ThemeToggle />
           <button
             onClick={() => logout()}
             title="Log out"

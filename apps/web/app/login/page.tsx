@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
@@ -83,6 +84,10 @@ export default function LoginPage() {
         className="pointer-events-none absolute left-1/2 top-0 h-[32rem] w-[48rem] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-20 blur-3xl"
         style={{ background: "radial-gradient(circle, hsl(var(--accent)), transparent 70%)" }}
       />
+
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
 
       <div className="relative w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
