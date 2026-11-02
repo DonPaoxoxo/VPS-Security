@@ -7,6 +7,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { NavSidebar } from "@/components/nav-sidebar";
 import { useAuth } from "@/lib/auth-context";
 import { CommandPaletteProvider } from "@/lib/command-palette-context";
+import { SidebarProvider } from "@/lib/sidebar-context";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -25,14 +26,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <CommandPaletteProvider>
-      <div className="flex">
-        <NavSidebar />
-        <main className="scrollbar-thin h-screen flex-1 overflow-y-auto bg-background p-8">
-          <div className="mx-auto max-w-[1600px]">{children}</div>
-        </main>
-      </div>
-      <CommandPalette />
-    </CommandPaletteProvider>
+    <SidebarProvider>
+      <CommandPaletteProvider>
+        <div className="flex">
+          <NavSidebar />
+          <main className="scrollbar-thin h-screen flex-1 overflow-y-auto bg-background p-8">
+            <div className="mx-auto max-w-[1600px]">{children}</div>
+          </main>
+        </div>
+        <CommandPalette />
+      </CommandPaletteProvider>
+    </SidebarProvider>
   );
 }
