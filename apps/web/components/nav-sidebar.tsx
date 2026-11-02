@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LogOut,
   Network,
+  Search,
   Server,
   Settings,
   ShieldAlert,
@@ -21,9 +22,10 @@ import { usePathname } from "next/navigation";
 
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
+import { useCommandPalette } from "@/lib/command-palette-context";
 import { cn } from "@/lib/cn";
 
-const NAV_SECTIONS = [
+export const NAV_SECTIONS = [
   {
     label: "Monitoring",
     items: [
@@ -64,8 +66,10 @@ const NAV_SECTIONS = [
 export function NavSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { setOpen } = useCommandPalette();
 
   const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "?";
+  const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-card-border bg-card">
@@ -76,6 +80,19 @@ export function NavSidebar() {
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold tracking-tight text-foreground">Server Security Center</p>
         </div>
+      </div>
+
+      <div className="px-3 pb-3">
+        <button
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center gap-2 rounded-md border border-card-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-surface-border hover:text-foreground"
+        >
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1 text-left">Search…</span>
+          <kbd className="shrink-0 rounded border border-card-border bg-card px-1.5 py-0.5 text-[10px]">
+            {isMac ? "⌘K" : "Ctrl K"}
+          </kbd>
+        </button>
       </div>
 
       <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 pb-4">
