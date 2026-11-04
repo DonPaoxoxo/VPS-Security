@@ -25,6 +25,8 @@ class _FakeResult:
         return _FakeScalars()
     def scalar_one_or_none(self):
         return None
+    def scalar_one(self):
+        return 0
 
 class _FakeSession:
     async def execute(self, query):

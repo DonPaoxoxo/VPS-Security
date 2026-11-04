@@ -9,7 +9,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -65,56 +65,93 @@ async def generate_pdf_report(
         servers_query = servers_query.where(Server.id == server_id)
     servers = (await db.execute(servers_query.order_by(Server.name))).scalars().all()
 
-    uptime_query = select(UptimeCheck).where(UptimeCheck.checked_at >= range_start, UptimeCheck.checked_at < range_end)
+    # These tables can accumulate a very large number of rows over time
+    # (uptime checks run every few minutes per target; failed logins and
+    # security events can spike hugely during a brute-force burst). Loading
+    # every matching row into memory just to count or display the newest 40
+    # of them previously OOM-killed the API container on real data -- counts
+    # are now computed in SQL via COUNT(), and only the rows actually shown
+    # in the PDF are ever fetched, capped at MAX_TABLE_ROWS in the query itself.
+
+    uptime_filters = [UptimeCheck.checked_at >= range_start, UptimeCheck.checked_at < range_end]
     if server_id:
-        uptime_query = uptime_query.where(
-            UptimeCheck.target_type == CheckTargetType.server, UptimeCheck.target_id == server_id
-        )
-    uptime_checks = (await db.execute(uptime_query)).scalars().all()
-    total_checks = len(uptime_checks)
-    up_checks = sum(1 for c in uptime_checks if c.is_up)
+        uptime_filters += [UptimeCheck.target_type == CheckTargetType.server, UptimeCheck.target_id == server_id]
+    total_checks = (await db.execute(select(func.count()).select_from(UptimeCheck).where(*uptime_filters))).scalar_one()
+    up_checks = (
+        await db.execute(select(func.count()).select_from(UptimeCheck).where(*uptime_filters, UptimeCheck.is_up.is_(True)))
+    ).scalar_one()
     uptime_pct = (up_checks / total_checks * 100) if total_checks else None
 
-    incidents_query = select(DowntimeIncident).where(
+    incident_filters = [
         DowntimeIncident.started_at < range_end,
         (DowntimeIncident.resolved_at.is_(None)) | (DowntimeIncident.resolved_at >= range_start),
-    )
+    ]
     if server_id:
-        incidents_query = incidents_query.where(
-            DowntimeIncident.target_type == CheckTargetType.server, DowntimeIncident.target_id == server_id
+        incident_filters += [DowntimeIncident.target_type == CheckTargetType.server, DowntimeIncident.target_id == server_id]
+    incident_count = (await db.execute(select(func.count()).select_from(DowntimeIncident).where(*incident_filters))).scalar_one()
+    incidents = (
+        await db.execute(
+            select(DowntimeIncident).where(*incident_filters).order_by(DowntimeIncident.started_at.desc()).limit(MAX_TABLE_ROWS)
         )
-    incidents = (await db.execute(incidents_query.order_by(DowntimeIncident.started_at.desc()))).scalars().all()
+    ).scalars().all()
 
-    sec_query = (
-        select(SecurityEvent)
-        .options(selectinload(SecurityEvent.server))
-        .where(SecurityEvent.occurred_at >= range_start, SecurityEvent.occurred_at < range_end)
-    )
+    sec_filters = [SecurityEvent.occurred_at >= range_start, SecurityEvent.occurred_at < range_end]
     if server_id:
-        sec_query = sec_query.where(SecurityEvent.server_id == server_id)
-    security_events = (await db.execute(sec_query.order_by(SecurityEvent.occurred_at.desc()))).scalars().all()
+        sec_filters.append(SecurityEvent.server_id == server_id)
+    security_event_count = (await db.execute(select(func.count()).select_from(SecurityEvent).where(*sec_filters))).scalar_one()
+    security_events = (
+        await db.execute(
+            select(SecurityEvent)
+            .options(selectinload(SecurityEvent.server))
+            .where(*sec_filters)
+            .order_by(SecurityEvent.occurred_at.desc())
+            .limit(MAX_TABLE_ROWS)
+        )
+    ).scalars().all()
 
-    login_query = select(LoginEvent).options(selectinload(LoginEvent.server)).where(
+    login_filters = [
         LoginEvent.occurred_at >= range_start,
         LoginEvent.occurred_at < range_end,
         LoginEvent.was_successful.is_(False),
-    )
+    ]
     if server_id:
-        login_query = login_query.where(LoginEvent.server_id == server_id)
-    failed_logins = (await db.execute(login_query.order_by(LoginEvent.occurred_at.desc()))).scalars().all()
+        login_filters.append(LoginEvent.server_id == server_id)
+    failed_login_count = (await db.execute(select(func.count()).select_from(LoginEvent).where(*login_filters))).scalar_one()
+    failed_logins = (
+        await db.execute(
+            select(LoginEvent)
+            .options(selectinload(LoginEvent.server))
+            .where(*login_filters)
+            .order_by(LoginEvent.occurred_at.desc())
+            .limit(MAX_TABLE_ROWS)
+        )
+    ).scalars().all()
 
-    fi_query = select(FileIntegrityEvent).options(selectinload(FileIntegrityEvent.server)).where(
-        FileIntegrityEvent.detected_at >= range_start, FileIntegrityEvent.detected_at < range_end
-    )
+    fi_filters = [FileIntegrityEvent.detected_at >= range_start, FileIntegrityEvent.detected_at < range_end]
     if server_id:
-        fi_query = fi_query.where(FileIntegrityEvent.server_id == server_id)
-    file_events = (await db.execute(fi_query.order_by(FileIntegrityEvent.detected_at.desc()))).scalars().all()
-    unapproved_file_events = [e for e in file_events if not e.is_approved_change]
+        fi_filters.append(FileIntegrityEvent.server_id == server_id)
+    file_event_count = (await db.execute(select(func.count()).select_from(FileIntegrityEvent).where(*fi_filters))).scalar_one()
+    unapproved_filters = [*fi_filters, FileIntegrityEvent.is_approved_change.is_(False)]
+    unapproved_count = (
+        await db.execute(select(func.count()).select_from(FileIntegrityEvent).where(*unapproved_filters))
+    ).scalar_one()
+    unapproved_file_events = (
+        await db.execute(
+            select(FileIntegrityEvent)
+            .options(selectinload(FileIntegrityEvent.server))
+            .where(*unapproved_filters)
+            .order_by(FileIntegrityEvent.detected_at.desc())
+            .limit(MAX_TABLE_ROWS)
+        )
+    ).scalars().all()
 
-    alerts_query = select(Alert).where(Alert.triggered_at >= range_start, Alert.triggered_at < range_end)
+    alert_filters = [Alert.triggered_at >= range_start, Alert.triggered_at < range_end]
     if server_id:
-        alerts_query = alerts_query.where(Alert.server_id == server_id)
-    alerts = (await db.execute(alerts_query.order_by(Alert.triggered_at.desc()))).scalars().all()
+        alert_filters.append(Alert.server_id == server_id)
+    alert_count = (await db.execute(select(func.count()).select_from(Alert).where(*alert_filters))).scalar_one()
+    alerts = (
+        await db.execute(select(Alert).where(*alert_filters).order_by(Alert.triggered_at.desc()).limit(MAX_TABLE_ROWS))
+    ).scalars().all()
 
     pdf_bytes = _render_pdf(
         generated_by=user.display_name or user.email,
@@ -124,11 +161,16 @@ async def generate_pdf_report(
         server_count=len(servers),
         total_checks=total_checks,
         uptime_pct=uptime_pct,
+        incident_count=incident_count,
         incidents=incidents,
+        security_event_count=security_event_count,
         security_events=security_events,
+        failed_login_count=failed_login_count,
         failed_logins=failed_logins,
-        file_events=file_events,
+        file_event_count=file_event_count,
+        unapproved_count=unapproved_count,
         unapproved_file_events=unapproved_file_events,
+        alert_count=alert_count,
         alerts=alerts,
     )
 
@@ -149,11 +191,16 @@ def _render_pdf(
     server_count: int,
     total_checks: int,
     uptime_pct: float | None,
+    incident_count: int,
     incidents: list[DowntimeIncident],
+    security_event_count: int,
     security_events: list[SecurityEvent],
+    failed_login_count: int,
     failed_logins: list[LoginEvent],
-    file_events: list[FileIntegrityEvent],
+    file_event_count: int,
+    unapproved_count: int,
     unapproved_file_events: list[FileIntegrityEvent],
+    alert_count: int,
     alerts: list[Alert],
 ) -> bytes:
     buf = BytesIO()
@@ -212,29 +259,30 @@ def _render_pdf(
         ["Servers in scope", str(server_count)],
         ["Uptime checks recorded", str(total_checks)],
         ["Uptime", f"{uptime_pct:.2f}%" if uptime_pct is not None else "No data"],
-        ["Downtime incidents", str(len(incidents))],
-        ["Security events", str(len(security_events))],
-        ["Failed login attempts", str(len(failed_logins))],
-        ["Unapproved file changes", f"{len(unapproved_file_events)} of {len(file_events)} total"],
-        ["Alerts triggered", str(len(alerts))],
+        ["Downtime incidents", str(incident_count)],
+        ["Security events", str(security_event_count)],
+        ["Failed login attempts", str(failed_login_count)],
+        ["Unapproved file changes", f"{unapproved_count} of {file_event_count} total"],
+        ["Alerts triggered", str(alert_count)],
     ]
     t = Table(summary_rows, colWidths=[2.8 * inch, 3.6 * inch])
     t.setStyle(table_style(len(summary_rows)))
     elements.append(t)
 
-    def add_table(heading: str, header: list[str], rows: list[list[str]], col_widths: list[float], empty_msg: str) -> None:
+    def add_table(
+        heading: str, header: list[str], rows: list[list[str]], total: int, col_widths: list[float], empty_msg: str
+    ) -> None:
         elements.append(Paragraph(heading, h2))
         if not rows:
             elements.append(Paragraph(empty_msg, body))
             return
-        shown = rows[:MAX_TABLE_ROWS]
-        data = [header] + shown
+        data = [header] + rows
         tbl = Table(data, colWidths=col_widths, repeatRows=1)
         tbl.setStyle(table_style(len(data)))
         elements.append(tbl)
-        if len(rows) > MAX_TABLE_ROWS:
+        if total > len(rows):
             elements.append(Spacer(1, 4))
-            elements.append(Paragraph(f"Showing {MAX_TABLE_ROWS} most recent of {len(rows)} total. See the dashboard for the full list.", note_style))
+            elements.append(Paragraph(f"Showing {len(rows)} most recent of {total} total. See the dashboard for the full list.", note_style))
 
     add_table(
         "Downtime Incidents",
@@ -248,6 +296,7 @@ def _render_pdf(
             ]
             for i in incidents
         ],
+        incident_count,
         [1.6 * inch, 1.5 * inch, 1.5 * inch, 1.8 * inch],
         "No downtime incidents in this period.",
     )
@@ -265,6 +314,7 @@ def _render_pdf(
             ]
             for e in security_events
         ],
+        security_event_count,
         [1.3 * inch, 1.5 * inch, 0.9 * inch, 1.4 * inch, 1.3 * inch],
         "No security events in this period.",
     )
@@ -281,6 +331,7 @@ def _render_pdf(
             ]
             for e in failed_logins
         ],
+        failed_login_count,
         [1.6 * inch, 1.6 * inch, 1.6 * inch, 1.6 * inch],
         "No failed login attempts in this period.",
     )
@@ -297,6 +348,7 @@ def _render_pdf(
             ]
             for e in unapproved_file_events
         ],
+        unapproved_count,
         [1.2 * inch, 2.8 * inch, 1.0 * inch, 1.4 * inch],
         "No unapproved file changes in this period.",
     )
@@ -305,6 +357,7 @@ def _render_pdf(
         "Alerts",
         ["Title", "Severity", "Status", "Triggered"],
         [[a.title, a.severity.value, a.status.value, a.triggered_at.strftime("%Y-%m-%d %H:%M")] for a in alerts],
+        alert_count,
         [3.0 * inch, 1.0 * inch, 1.1 * inch, 1.3 * inch],
         "No alerts in this period.",
     )
