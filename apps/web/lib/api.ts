@@ -48,8 +48,26 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return (await resp.json()) as T;
 }
 
+async function getBlob(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const resp = await fetch(`${API_BASE}${path}`, { credentials: "include" });
+  if (!resp.ok) {
+    let detail = resp.statusText;
+    try {
+      const body = await resp.json();
+      detail = body.detail ?? detail;
+    } catch {
+      // response had no JSON body
+    }
+    throw new ApiError(resp.status, detail);
+  }
+  const disposition = resp.headers.get("Content-Disposition");
+  const match = disposition?.match(/filename="?([^"]+)"?/);
+  return { blob: await resp.blob(), filename: match?.[1] ?? null };
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  getBlob,
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body?: unknown) =>

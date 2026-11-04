@@ -5,7 +5,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.security_headers import NoStoreCacheMiddleware
-from app.routers import aapanel, agents, alerts, audit, auth, domains, overview, performance, security_center, servers, settings
+from app.routers import aapanel, agents, alerts, audit, auth, domains, overview, performance, reports, security_center, servers, settings
 from ssc_core.config import get_settings
 
 settings_ = get_settings()
@@ -59,6 +59,7 @@ app.include_router(alerts.router)
 app.include_router(settings.router)
 app.include_router(performance.router)
 app.include_router(audit.router)
+app.include_router(reports.router)
 
 
 @app.get("/health")
